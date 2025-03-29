@@ -113,12 +113,14 @@
   (display "  list-open              List open requests\n")
   (display "  summary                Summarize turnaround metrics\n")
   (display "  triage                 List overdue and due-soon reviews\n")
+  (display "  queue                  Summarize open review risk buckets\n")
   (display "  sla                    Report SLA performance by reviewer\n\n")
   (display "Examples:\n")
   (display "  review-turnaround-pulse add-request --scholar S-100 --cohort Cohort-2026A --reviewer Alex --requested-at 2026-02-01 --due-at 2026-02-05\n")
   (display "  review-turnaround-pulse close-request --id 12 --completed-at 2026-02-04 --outcome approved\n")
   (display "  review-turnaround-pulse summary --since 2026-01-01\n")
   (display "  review-turnaround-pulse triage --as-of 2026-02-08 --window-hours 48 --reviewer \"Alex Morgan\"\n")
+  (display "  review-turnaround-pulse queue --as-of 2026-02-08 --window-hours 48 --target-hours 72 --group-by reviewer\n")
   (display "  review-turnaround-pulse sla --since 2026-01-01 --target-hours 72\n"))
 
 (define (cmd-init-db)
@@ -209,6 +211,39 @@
 (define (cmd-sla flags)
   (psql-run (build-sla-sql flags)))
 
+(define (validate-group-by value)
+  (cond
+   ((string=? value "reviewer") value)
+   ((string=? value "cohort") value)
+   (else
+    (display (string-append "Invalid --group-by value: " value "\n"))
+    (exit 1))))
+
+(define (build-queue-sql flags)
+  (let* ((as-of (flag flags "as-of" "now"))
+         (window (flag flags "window-hours" "48"))
+         (target-hours (flag flags "target-hours" "72"))
+         (group-by (validate-group-by (flag flags "group-by" "reviewer")))
+         (deadline (deadline-expr target-hours))
+         (filters (string-append
+                   (optional-filter flags "cohort" "cohort")
+                   (optional-filter flags "reviewer" "reviewer"))))
+    (string-append
+     "SELECT " group-by ",\n"
+     "       count(*) AS open_total,\n"
+     "       count(*) FILTER (WHERE " deadline " <= " (sql-quote as-of) ") AS overdue,\n"
+     "       count(*) FILTER (WHERE " deadline " > " (sql-quote as-of)
+     " AND " deadline " <= " (sql-quote as-of) " + interval '" window " hours') AS due_soon,\n"
+     "       round(avg(extract(epoch from (" (sql-quote as-of) " - requested_at)))/3600, 1) AS avg_age_hours\n"
+     "FROM gs_review_turnaround_requests\n"
+     "WHERE completed_at IS NULL\n"
+     filters "\n"
+     "GROUP BY " group-by "\n"
+     "ORDER BY overdue DESC, due_soon DESC, open_total DESC;")))
+
+(define (cmd-queue flags)
+  (psql-run (build-queue-sql flags)))
+
 (define (build-triage-sql flags)
   (let* ((as-of (flag flags "as-of" "now"))
          (window (flag flags "window-hours" "48"))
@@ -245,6 +280,7 @@
          ((string=? cmd "list-open") (cmd-list-open))
          ((string=? cmd "summary") (cmd-summary flags))
          ((string=? cmd "triage") (cmd-triage flags))
+         ((string=? cmd "queue") (cmd-queue flags))
          ((string=? cmd "sla") (cmd-sla flags))
          (else (begin (print-usage) (exit 1)))))))
 

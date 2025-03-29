@@ -25,4 +25,24 @@
   (test* "triage filters cohort" #t (not (eq? #f (string-contains sql-filtered "cohort='Cohort-2026A'"))))
   (test* "triage filters reviewer" #t (not (eq? #f (string-contains sql-filtered "reviewer='Alex Morgan'")))))
 
+(test* "deadline-expr uses target hours"
+       "COALESCE(due_at, requested_at + (INTERVAL '1 hour' * 72))"
+       (deadline-expr 72))
+
+(let ((sql (build-sla-sql (list (cons "since" "2026-01-01") (cons "target-hours" "48")))))
+  (test* "sla includes reviewer" #t (not (eq? #f (string-contains sql "SELECT reviewer"))))
+  (test* "sla includes on time" #t (not (eq? #f (string-contains sql "completed_on_time"))))
+  (test* "sla includes overdue" #t (not (eq? #f (string-contains sql "open_overdue")))))
+
+(let ((sql (build-queue-sql (list (cons "as-of" "2026-02-08")
+                                  (cons "window-hours" "24")
+                                  (cons "target-hours" "36")
+                                  (cons "group-by" "cohort")
+                                  (cons "reviewer" "Alex Morgan")))))
+  (test* "queue includes group by cohort" #t (not (eq? #f (string-contains sql "SELECT cohort"))))
+  (test* "queue includes overdue" #t (not (eq? #f (string-contains sql "AS overdue"))))
+  (test* "queue includes due soon" #t (not (eq? #f (string-contains sql "AS due_soon"))))
+  (test* "queue filters reviewer" #t (not (eq? #f (string-contains sql "reviewer='Alex Morgan'"))))
+  (test* "queue uses window" #t (not (eq? #f (string-contains sql "interval '24 hours'")))))
+
 (test-end)
