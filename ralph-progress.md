@@ -18,3 +18,4 @@
 - Added queue command to summarize open review risk buckets by reviewer or cohort.
 - Added group-by validation and SQL builder for queue reporting.
 - Expanded tests and README with queue usage.
+- Added list-open age hours reporting with cohort/reviewer filters.

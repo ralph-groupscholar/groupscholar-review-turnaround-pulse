@@ -118,6 +118,7 @@
   (display "Examples:\n")
   (display "  review-turnaround-pulse add-request --scholar S-100 --cohort Cohort-2026A --reviewer Alex --requested-at 2026-02-01 --due-at 2026-02-05\n")
   (display "  review-turnaround-pulse close-request --id 12 --completed-at 2026-02-04 --outcome approved\n")
+  (display "  review-turnaround-pulse list-open --as-of 2026-02-08 --cohort Cohort-2026A\n")
   (display "  review-turnaround-pulse summary --since 2026-01-01\n")
   (display "  review-turnaround-pulse triage --as-of 2026-02-08 --window-hours 48 --reviewer \"Alex Morgan\"\n")
   (display "  review-turnaround-pulse queue --as-of 2026-02-08 --window-hours 48 --target-hours 72 --group-by reviewer\n")
@@ -161,13 +162,21 @@
     (psql-run sql)
     (display "Request closed.\n")))
 
-(define (cmd-list-open)
-  (psql-run
-   (string-append
-    "SELECT id, scholar_id, cohort, reviewer, requested_at, due_at\n"
-    "FROM gs_review_turnaround_requests\n"
-    "WHERE completed_at IS NULL\n"
-    "ORDER BY requested_at ASC;")))
+(define (build-list-open-sql flags)
+  (let* ((as-of (flag flags "as-of" "now"))
+         (filters (string-append
+                   (optional-filter flags "cohort" "cohort")
+                   (optional-filter flags "reviewer" "reviewer"))))
+    (string-append
+     "SELECT id, scholar_id, cohort, reviewer, requested_at, due_at,\n"
+     "       round(extract(epoch from (" (sql-quote as-of) " - requested_at)) / 3600, 1) AS age_hours\n"
+     "FROM gs_review_turnaround_requests\n"
+     "WHERE completed_at IS NULL"
+     filters "\n"
+     "ORDER BY requested_at ASC;")))
+
+(define (cmd-list-open flags)
+  (psql-run (build-list-open-sql flags)))
 
 (define (cmd-summary flags)
   (let* ((since (flag flags "since" "1970-01-01"))
@@ -277,7 +286,7 @@
          ((string=? cmd "seed") (cmd-seed))
          ((string=? cmd "add-request") (cmd-add-request flags))
          ((string=? cmd "close-request") (cmd-close-request flags))
-         ((string=? cmd "list-open") (cmd-list-open))
+         ((string=? cmd "list-open") (cmd-list-open flags))
          ((string=? cmd "summary") (cmd-summary flags))
          ((string=? cmd "triage") (cmd-triage flags))
          ((string=? cmd "queue") (cmd-queue flags))

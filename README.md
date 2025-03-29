@@ -5,7 +5,7 @@ Review Turnaround Pulse is a Gauche Scheme CLI that logs scholarship review requ
 ## Features
 - Log review requests with requested and due timestamps.
 - Close requests and record outcomes.
-- List open reviews and summarize turnaround averages by reviewer.
+- List open reviews with age hours and optional filters.
 - Triage overdue and due-soon reviews with optional cohort/reviewer filters.
 - Report SLA performance by reviewer with on-time and overdue counts.
 - Summarize open review risk buckets by reviewer or cohort.
@@ -41,7 +41,7 @@ bin/review-turnaround-pulse add-request \
   --notes "Priority scholarship"
 
 bin/review-turnaround-pulse close-request --id 12 --completed-at 2026-02-04 --outcome approved
-bin/review-turnaround-pulse list-open
+bin/review-turnaround-pulse list-open --as-of 2026-02-08 --cohort Cohort-2026A
 bin/review-turnaround-pulse summary --since 2026-01-01
 bin/review-turnaround-pulse triage --as-of 2026-02-08 --window-hours 48 --reviewer "Alex Morgan"
 bin/review-turnaround-pulse queue --as-of 2026-02-08 --window-hours 48 --target-hours 72 --group-by reviewer

@@ -25,6 +25,11 @@
   (test* "triage filters cohort" #t (not (eq? #f (string-contains sql-filtered "cohort='Cohort-2026A'"))))
   (test* "triage filters reviewer" #t (not (eq? #f (string-contains sql-filtered "reviewer='Alex Morgan'")))))
 
+(let ((sql (build-list-open-sql (list (cons "as-of" "2026-02-08")
+                                      (cons "cohort" "Cohort-2026A")))))
+  (test* "list-open includes age" #t (not (eq? #f (string-contains sql "age_hours"))))
+  (test* "list-open filters cohort" #t (not (eq? #f (string-contains sql "cohort='Cohort-2026A'")))))
+
 (test* "deadline-expr uses target hours"
        "COALESCE(due_at, requested_at + (INTERVAL '1 hour' * 72))"
        (deadline-expr 72))
